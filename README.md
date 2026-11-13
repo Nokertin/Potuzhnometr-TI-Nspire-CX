@@ -43,7 +43,7 @@
 Готовый файл — **`potuzhnometr.tns`**, его и нужно копировать на калькулятор.
 
 1. Подключите TI-Nspire CX к компьютеру по USB.
-2. Откройте **TI-Nspire CX Student Software** (или N-Link).
+2. Откройте TI-Nspire CX Student Software (или [N-Link](https://github.com/lights0123/n-link)).
 3. Скопируй `potuzhnometr.tns` в память калькулятора.
 4. На калькуляторе открой документ — скрипт запускается сам, когда страница со скриптом активна.
 
