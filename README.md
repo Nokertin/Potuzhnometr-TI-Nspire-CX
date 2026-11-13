@@ -122,7 +122,6 @@ luna potuzhnometr.lua potuzhnometr.tns
 ```
 .
 ├── potuzhnometr.lua            # исходный код (Lua 5.1, API 2.0)
-├── potuzhnometr.tns            # готовый файл для калькулятора
 ├── README.txt                  # инструкция на транслите (внутри архива)
 ├── README.md                   # этот файл
 └── docs/
