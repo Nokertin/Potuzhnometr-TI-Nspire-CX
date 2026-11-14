@@ -1,10 +1,14 @@
--- POTUZHNOMETR v1.2
+-- POTUZHNOMETR v1.3
 -- TI-Nspire CX (1st gen), Lua 5.1, API 2.0
 -- v1.1 fix: Del key did not work in the editor, because the
 -- handler was wrongly named on.backspace(). The correct TI
 -- event is on.backspaceKey() - it fires on the handheld Del key.
 -- v1.2: two modes on start - SHKALY (the old meters) and
 -- TRUE / FALSE (green/red gauge, needle lands on TRUE or FALSE).
+-- v1.3: old Geiger-counter look - cream panel, brass screws,
+-- serif numerals, mechanical counter window. Help screen
+-- shortened to 13 lines so it fits the 318x212 screen
+-- (in v1.2 it had 25 lines and the TRUE/FALSE help was cut off).
 -- Only ASCII / English alphabet, translit labels.
 -- A fun simulator: it does NOT measure anything real.
 platform.apiLevel = "2.0"
@@ -23,6 +27,20 @@ local tfSpinning = false
 local tfSpin = 0
 local tfTrue = 0
 local tfFalse = 0
+
+-- Geiger-counter theme: cream panel, dark ink, brass, muted red/green.
+local C_PANEL = {238, 226, 196}
+local C_PANEL_DARK = {214, 196, 158}
+local C_INK = {43, 32, 22}
+local C_MUTED = {110, 88, 60}
+local C_BRASS = {176, 141, 60}
+local C_RED = {178, 34, 34}
+local C_GREEN = {52, 140, 70}
+local C_WIN = {24, 20, 16}
+local C_WIN_TEXT = {240, 230, 200}
+-- fixed wear texture, built once at init so it never flickers
+local speckles = {}
+local scratches = {}
 local value = 0
 local target = 0
 local measuring = false
@@ -78,6 +96,22 @@ local function init()
     -- Stir the random generator a little. TI Lua has no os.time,
     -- so the sequence still differs from run to run in practice
     -- because math.random is called many times during play.
+    -- wear texture on a fixed seed, so speckles and scratches
+    -- stay in the same place on every repaint
+    math.randomseed(424242)
+    for i = 1, 110 do
+        speckles[#speckles + 1] = {math.random(6, W - 6), math.random(6, H - 6)}
+    end
+    for i = 1, 14 do
+        local x = math.random(12, W - 40)
+        local y = math.random(12, H - 12)
+        local ln = math.random(6, 26)
+        local a = math.random() * math.pi
+        scratches[#scratches + 1] = {
+            x, y, x + ln * math.cos(a), y + ln * math.sin(a),
+            math.random(1, 2) == 1,
+        }
+    end
     math.randomseed(1234567)
     for i = 1, 20 do math.random() end
 end
@@ -105,9 +139,9 @@ local function verdictText(p)
 end
 
 local function zoneColor(p, m)
-    if p >= m.crit then return 220, 40, 40 end
-    if p >= 50 then return 230, 140, 0 end
-    return 40, 160, 60
+    if p >= m.crit then return 178, 34, 34 end
+    if p >= 50 then return 200, 130, 20 end
+    return 52, 140, 70
 end
 
 local function textWidth(gc, s)
@@ -116,35 +150,67 @@ local function textWidth(gc, s)
     return #s * 7
 end
 
-local function drawCenter(gc, s, y, size, bold, r, g, b)
+local function drawCenter(gc, s, y, size, bold, r, g, b, fname)
     gc:setColorRGB(r, g, b)
-    if bold then gc:setFont("sansserif", "b", size)
-    else gc:setFont("sansserif", "r", size) end
+    if bold then gc:setFont(fname or "sansserif", "b", size)
+    else gc:setFont(fname or "sansserif", "r", size) end
     local w = textWidth(gc, s)
     gc:drawString(s, math.floor((W - w) / 2), y, "top")
 end
 
-local function drawLeft(gc, s, x, y, size, bold, r, g, b)
+local function drawLeft(gc, s, x, y, size, bold, r, g, b, fname)
     gc:setColorRGB(r, g, b)
-    if bold then gc:setFont("sansserif", "b", size)
-    else gc:setFont("sansserif", "r", size) end
+    if bold then gc:setFont(fname or "sansserif", "b", size)
+    else gc:setFont(fname or "sansserif", "r", size) end
     gc:drawString(s, x, y, "top")
 end
 
+-- cream panel + fixed wear (speckles, scratches)
+local function drawPanel(gc)
+    gc:setColorRGB(C_PANEL[1], C_PANEL[2], C_PANEL[3])
+    gc:fillRect(0, 0, W, H)
+    gc:setColorRGB(C_PANEL_DARK[1], C_PANEL_DARK[2], C_PANEL_DARK[3])
+    for i = 1, #speckles do
+        gc:fillRect(speckles[i][1], speckles[i][2], 1, 1)
+    end
+    for i = 1, #scratches do
+        local s = scratches[i]
+        if s[5] then gc:setColorRGB(245, 235, 210)
+        else gc:setColorRGB(120, 95, 60) end
+        gc:drawLine(s[1], s[2], s[3], s[4])
+    end
+end
+
+-- brass screw with a slot, at one of the panel corners
+local function drawScrew(gc, x, y, angDeg)
+    gc:setColorRGB(140, 90, 40)
+    gc:fillArc(x - 6, y - 6, 12, 12, 0, 360)
+    gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
+    gc:fillArc(x - 5, y - 5, 10, 10, 0, 360)
+    gc:setColorRGB(60, 44, 16)
+    local a = math.rad(angDeg)
+    local dx = math.cos(a) * 4
+    local dy = math.sin(a) * 4
+    gc:setPen("thick", "smooth")
+    gc:drawLine(x - dx, y - dy, x + dx, y + dy)
+    gc:setPen("thin", "smooth")
+end
+
 local function drawHeader(gc, title)
-    gc:setColorRGB(25, 55, 130)
-    gc:fillRect(0, 0, W, 26)
-    drawCenter(gc, title, 5, 13, true, 255, 255, 255)
+    -- name plate: serif title + small model line, no blue bar
+    drawCenter(gc, title, 6, 15, true, C_INK[1], C_INK[2], C_INK[3], "serif")
+    drawCenter(gc, "MODEL CX-1 - EST. 1962", 24, 8, false,
+        C_MUTED[1], C_MUTED[2], C_MUTED[3], "serif")
 end
 
 local function drawFooter(gc, line1, line2)
-    gc:setColorRGB(90, 90, 90)
+    gc:setColorRGB(C_MUTED[1], C_MUTED[2], C_MUTED[3])
     gc:setFont("sansserif", "r", 9)
     if line2 then
-        gc:drawString(line1, 6, H - 26, "top")
-        gc:drawString(line2, 6, H - 14, "top")
+        gc:drawString(line1, 28, H - 26, "top")
+        gc:drawString(line2, 28, H - 14, "top")
     else
-        gc:drawString(line1, 6, H - 16, "top")
+        gc:drawString(line1, 28, H - 16, "top")
     end
 end
 
@@ -153,26 +219,31 @@ end
 local menuFirst = 1
 
 local function drawMenu(gc)
-    drawHeader(gc, "POTUZHNOMETR v1.2")
-    drawLeft(gc, "VYBERI SHKALU:", 8, 32, 11, true, 0, 0, 0)
+    drawHeader(gc, "POTUZHNOMETR v1.3")
+    drawLeft(gc, "VYBERI SHKALU:", 8, 36, 11, true,
+        C_INK[1], C_INK[2], C_INK[3], "serif")
     -- show 5 items at a time, scroll when selection moves down
     if sel < menuFirst then menuFirst = sel end
     if sel > menuFirst + 4 then menuFirst = sel - 4 end
     if menuFirst > #meters - 4 and #meters > 5 then menuFirst = #meters - 4 end
     if menuFirst < 1 then menuFirst = 1 end
-    local y0 = 50
+    local y0 = 54
     for i = menuFirst, #meters do
         local m = meters[i]
         local y = y0 + (i - menuFirst) * 26
         if y > H - 34 then break end
         if i == sel then
-            gc:setColorRGB(190, 215, 255)
+            gc:setColorRGB(C_PANEL_DARK[1], C_PANEL_DARK[2], C_PANEL_DARK[3])
             gc:fillRect(4, y - 2, W - 8, 24)
-            gc:setColorRGB(25, 55, 130)
+            gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
+            gc:drawRect(4, y - 2, W - 8, 24)
+        else
+            gc:setColorRGB(C_MUTED[1], C_MUTED[2], C_MUTED[3])
             gc:drawRect(4, y - 2, W - 8, 24)
         end
         local label = i .. ". " .. m.name .. "  (" .. m.unit .. ", max " .. m.max .. ")"
-        drawLeft(gc, label, 10, y, 11, i == sel, 0, 0, 0)
+        drawLeft(gc, label, 10, y, 11, i == sel,
+            C_INK[1], C_INK[2], C_INK[3], "serif")
     end
     drawFooter(gc, "Up/Down: vybor   Enter: izmerit", "N: novaya   E: redakt.   D: udalit   H: pomosch")
 end
@@ -180,22 +251,28 @@ end
 -- ---------- START SCREEN: TWO MODES ----------
 
 local function drawSelect(gc)
-    drawHeader(gc, "POTUZHNOMETR v1.2")
-    drawCenter(gc, "VYBERI REZHIM:", 38, 13, true, 0, 0, 0)
+    drawHeader(gc, "POTUZHNOMETR v1.3")
+    drawCenter(gc, "VYBERI REZHIM:", 40, 13, true,
+        C_INK[1], C_INK[2], C_INK[3], "serif")
     local items = {
         {title = "1. SHKALY", desc = "Potuzhnometr, Mangometr, Kotometr"},
         {title = "2. TRUE / FALSE", desc = "Strelka: TRUE ili FALSE?"},
     }
     for i = 1, 2 do
-        local y = 62 + (i - 1) * 52
+        local y = 64 + (i - 1) * 52
         if i == topSel then
-            gc:setColorRGB(190, 215, 255)
+            gc:setColorRGB(C_PANEL_DARK[1], C_PANEL_DARK[2], C_PANEL_DARK[3])
             gc:fillRect(8, y - 2, W - 16, 44)
-            gc:setColorRGB(25, 55, 130)
+            gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
+            gc:drawRect(8, y - 2, W - 16, 44)
+        else
+            gc:setColorRGB(C_MUTED[1], C_MUTED[2], C_MUTED[3])
             gc:drawRect(8, y - 2, W - 16, 44)
         end
-        drawLeft(gc, items[i].title, 20, y + 2, 13, true, 0, 0, 0)
-        drawLeft(gc, items[i].desc, 20, y + 22, 10, false, 60, 60, 60)
+        drawLeft(gc, items[i].title, 20, y + 2, 13, true,
+            C_INK[1], C_INK[2], C_INK[3], "serif")
+        drawLeft(gc, items[i].desc, 20, y + 22, 10, false,
+            C_MUTED[1], C_MUTED[2], C_MUTED[3])
     end
     drawFooter(gc, "Up/Down: vybor   Enter: otkryt", "1: shkaly   2: true / false")
 end
@@ -216,14 +293,14 @@ local function drawTF(gc)
         local y1 = cy - math.floor((r - 13) * math.sin(ang) + 0.5)
         local x2 = cx + math.floor(r * math.cos(ang) + 0.5)
         local y2 = cy - math.floor(r * math.sin(ang) + 0.5)
-        if deg > 95 then gc:setColorRGB(40, 160, 60)
-        elseif deg >= 85 then gc:setColorRGB(230, 140, 0)
-        else gc:setColorRGB(220, 40, 40) end
+        if deg > 95 then gc:setColorRGB(C_GREEN[1], C_GREEN[2], C_GREEN[3])
+        elseif deg >= 85 then gc:setColorRGB(200, 130, 20)
+        else gc:setColorRGB(C_RED[1], C_RED[2], C_RED[3]) end
         gc:setPen("thick", "smooth")
         gc:drawLine(x1, y1, x2, y2)
     end
     gc:setPen("thin", "smooth")
-    gc:setColorRGB(0, 0, 0)
+    gc:setColorRGB(C_INK[1], C_INK[2], C_INK[3])
     gc:drawArc(cx - r, cy - r, r * 2, r * 2, 0, 180)
     gc:drawArc(cx - r + 13, cy - r + 13, (r - 13) * 2, (r - 13) * 2, 0, 180)
 
@@ -231,36 +308,46 @@ local function drawTF(gc)
     local ang = math.rad(tfAngle)
     local nx = cx + math.floor((r - 16) * math.cos(ang) + 0.5)
     local ny = cy - math.floor((r - 16) * math.sin(ang) + 0.5)
-    gc:setColorRGB(40, 40, 40)
+    gc:setColorRGB(C_INK[1], C_INK[2], C_INK[3])
     gc:setPen("thick", "smooth")
     gc:drawLine(cx, cy, nx, ny)
     gc:setPen("thin", "smooth")
+    gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
     gc:fillArc(cx - 6, cy - 6, 12, 12, 0, 360)
 
     -- result text inside the gauge
     if tfSpinning then
-        drawCenter(gc, "DUMAEM...", 96, 14, true, 90, 90, 90)
+        drawCenter(gc, "DUMAEM...", 96, 14, true,
+            C_MUTED[1], C_MUTED[2], C_MUTED[3], "serif")
     elseif tfResult == "TRUE" then
-        drawCenter(gc, "TRUE!", 96, 18, true, 40, 160, 60)
+        drawCenter(gc, "TRUE!", 96, 18, true,
+            C_GREEN[1], C_GREEN[2], C_GREEN[3], "serif")
     elseif tfResult == "FALSE" then
-        drawCenter(gc, "FALSE!", 96, 18, true, 220, 40, 40)
+        drawCenter(gc, "FALSE!", 96, 18, true,
+            C_RED[1], C_RED[2], C_RED[3], "serif")
     else
-        drawCenter(gc, "?", 96, 18, true, 90, 90, 90)
+        drawCenter(gc, "?", 96, 18, true,
+            C_MUTED[1], C_MUTED[2], C_MUTED[3], "serif")
     end
 
     -- TRUE / FALSE labels, the result one is coloured
     if tfResult == "TRUE" then
-        drawLeft(gc, "TRUE", 16, cy + 4, 16, true, 40, 160, 60)
+        drawLeft(gc, "TRUE", 16, cy + 4, 16, true,
+            C_GREEN[1], C_GREEN[2], C_GREEN[3], "serif")
     else
-        drawLeft(gc, "TRUE", 16, cy + 4, 16, true, 0, 0, 0)
+        drawLeft(gc, "TRUE", 16, cy + 4, 16, true,
+            C_INK[1], C_INK[2], C_INK[3], "serif")
     end
     if tfResult == "FALSE" then
-        drawLeft(gc, "FALSE", W - 76, cy + 4, 16, true, 220, 40, 40)
+        drawLeft(gc, "FALSE", W - 76, cy + 4, 16, true,
+            C_RED[1], C_RED[2], C_RED[3], "serif")
     else
-        drawLeft(gc, "FALSE", W - 76, cy + 4, 16, true, 0, 0, 0)
+        drawLeft(gc, "FALSE", W - 76, cy + 4, 16, true,
+            C_INK[1], C_INK[2], C_INK[3], "serif")
     end
 
-    drawCenter(gc, "TRUE: " .. tfTrue .. "    FALSE: " .. tfFalse, 176, 11, true, 0, 0, 0)
+    drawCenter(gc, "TRUE: " .. tfTrue .. "    FALSE: " .. tfFalse, 176, 11, true,
+        C_INK[1], C_INK[2], C_INK[3], "serif")
     drawFooter(gc, "Enter: KRUTIT   R: sbros scheta", "Esc: nazad k vyboru rezhima")
 end
 
@@ -299,40 +386,46 @@ local function drawMeasure(gc)
     gc:setPen("thin", "smooth")
 
     -- arc outline, top semicircle: start 0 deg, turn 180 deg
-    gc:setColorRGB(0, 0, 0)
+    gc:setColorRGB(C_INK[1], C_INK[2], C_INK[3])
     gc:drawArc(cx - r, cy - r, r * 2, r * 2, 0, 180)
     gc:drawArc(cx - r + 9, cy - r + 9, (r - 9) * 2, (r - 9) * 2, 0, 180)
 
-    -- tick labels
-    gc:setColorRGB(90, 90, 90)
-    gc:setFont("sansserif", "r", 9)
-    gc:drawString("0", cx - r - 2, cy - 4, "top")
-    gc:drawString("100", cx + r - 16, cy - 4, "top")
+    -- tick labels, serif like on an old dial
+    gc:setColorRGB(C_MUTED[1], C_MUTED[2], C_MUTED[3])
+    gc:setFont("serif", "b", 11)
+    gc:drawString("0", cx - r - 2, cy - 6, "top")
+    gc:drawString("100", cx + r - 18, cy - 6, "top")
     gc:drawString(tostring(m.max), cx - 8, cy - r - 14, "top")
 
-    -- needle
+    -- needle, ink black with a brass hub
     local ang = math.rad(180 - pShow * 1.8)
     local nx = cx + math.floor((r - 14) * math.cos(ang) + 0.5)
     local ny = cy - math.floor((r - 14) * math.sin(ang) + 0.5)
     local cr, cg, cb = zoneColor(p, m)
-    gc:setColorRGB(cr, cg, cb)
+    gc:setColorRGB(C_INK[1], C_INK[2], C_INK[3])
     gc:setPen("thick", "smooth")
     gc:drawLine(cx, cy, nx, ny)
     gc:setPen("thin", "smooth")
-    gc:setColorRGB(0, 0, 0)
+    gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
     gc:fillArc(cx - 6, cy - 6, 12, 12, 0, 360)
 
-    -- big value
+    -- mechanical counter window with the value
     local valStr = tostring(value) .. " " .. m.unit
-    drawCenter(gc, valStr, 96, 20, true, cr, cg, cb)
-    drawCenter(gc, string.format("%d%%", math.floor(p + 0.5)), 120, 12, true, 0, 0, 0)
+    gc:setColorRGB(C_WIN[1], C_WIN[2], C_WIN[3])
+    gc:fillRect(cx - 48, 92, 96, 26)
+    gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
+    gc:drawRect(cx - 48, 92, 96, 26)
+    drawCenter(gc, valStr, 95, 16, true,
+        C_WIN_TEXT[1], C_WIN_TEXT[2], C_WIN_TEXT[3], "serif")
+    drawCenter(gc, string.format("%d%%", math.floor(p + 0.5)), 122, 12, true,
+        C_INK[1], C_INK[2], C_INK[3], "serif")
 
-    -- verdict / status
+    -- verdict / status, stamped in red when critical
     local vt = verdictText(p)
-    local vr, vg, vb = 0, 0, 0
-    if exploded then vr, vg, vb = 220, 0, 0
-    elseif p >= m.crit then vr, vg, vb = 220, 40, 40 end
-    drawCenter(gc, vt, 168, 13, true, vr, vg, vb)
+    local vr, vg, vb = C_INK[1], C_INK[2], C_INK[3]
+    if exploded then vr, vg, vb = 178, 34, 34
+    elseif p >= m.crit then vr, vg, vb = 178, 34, 34 end
+    drawCenter(gc, vt, 168, 13, true, vr, vg, vb, "serif")
 
     -- explosion animation
     if exploded then
@@ -409,19 +502,27 @@ local function drawEdit(gc)
         "MAX:  " .. tostring(editMeter.max),
         "KRIT %:  " .. tostring(editMeter.crit),
     }
-    local y0 = 44
+    local y0 = 46
     for i = 1, 4 do
         local y = y0 + (i - 1) * 28
         if i == editField then
-            gc:setColorRGB(190, 215, 255)
+            gc:setColorRGB(C_PANEL_DARK[1], C_PANEL_DARK[2], C_PANEL_DARK[3])
             gc:fillRect(4, y - 3, W - 8, 24)
+            gc:setColorRGB(C_BRASS[1], C_BRASS[2], C_BRASS[3])
+            gc:drawRect(4, y - 3, W - 8, 24)
+        else
+            gc:setColorRGB(C_MUTED[1], C_MUTED[2], C_MUTED[3])
+            gc:drawRect(4, y - 3, W - 8, 24)
         end
-        drawLeft(gc, fields[i], 12, y, 12, i == editField, 0, 0, 0)
+        drawLeft(gc, fields[i], 12, y, 12, i == editField,
+            C_INK[1], C_INK[2], C_INK[3], "serif")
         if i == editField then
-            drawLeft(gc, "<", W - 22, y, 12, true, 25, 55, 130)
+            drawLeft(gc, "<", W - 22, y, 12, true,
+                C_BRASS[1], C_BRASS[2], C_BRASS[3], "serif")
         end
     end
-    drawLeft(gc, "Pechatay bukvy i tsifry.", 8, 164, 10, false, 0, 0, 0)
+    drawLeft(gc, "Pechatay bukvy i tsifry.", 8, 166, 10, false,
+        C_MUTED[1], C_MUTED[2], C_MUTED[3])
     drawFooter(gc, "Up/Down: pole   Left/Right: chislo", "Enter: dalshe / sohranit   Esc: otmena")
 end
 
@@ -429,36 +530,26 @@ end
 
 local function drawHelp(gc)
     drawHeader(gc, "POMOSCH")
+    -- exactly 13 lines: that is all that fits the 318x212 screen
+    -- (v1.2 had 25 lines and the TRUE/FALSE help was cut off)
     local lines = {
-        "Eto shutochny simulator.",
-        "On nichego ne izmeryaet",
+        "Eto shutochny simulator,",
+        "on nichego ne izmeryaet",
         "po-nastoyaschemu.",
-        "",
-        "Dva rezhima na starte:",
-        "SHKALY i TRUE / FALSE.",
-        "Esc v menju shkal - nazad",
-        "k vyboru rezhima.",
-        "",
-        "MENU: Up/Down, Enter.",
-        "N - novaya shkala,",
-        "E - redaktirovat,",
-        "D - udalit shkaly.",
-        "",
-        "IZMERENIE: Enter - start,",
-        "Up - podkachat vruchnuyu.",
-        "Esli znachenie vyshe MAX -",
-        "shkala vzryvaetsya :)",
-        "",
-        "TRUE / FALSE: Enter -",
-        "krutit strelku, R - sbros",
-        "scheta TRUE / FALSE.",
-        "",
-        "Shkaly sohranyayutsya",
-        "v dokumente (.tns).",
+        "Dva rezhima: SHKALY",
+        "i TRUE / FALSE.",
+        "MENU: N - novaya, E -",
+        "redakt., D - udalit.",
+        "Del - steret bukvu.",
+        "IZMERENIE: Enter -",
+        "start/stop, Up - podkachat.",
+        "TRUE/FALSE: Enter -",
+        "krutit, R - sbros scheta.",
+        "Esc - nazad.",
     }
-    local y = 34
-    gc:setFont("sansserif", "r", 11)
-    gc:setColorRGB(0, 0, 0)
+    local y = 36
+    gc:setFont("serif", "r", 11)
+    gc:setColorRGB(C_INK[1], C_INK[2], C_INK[3])
     for i = 1, #lines do
         gc:drawString(lines[i], 10, y, "top")
         y = y + 13
@@ -512,8 +603,7 @@ end
 
 function on.paint(gc)
     init()
-    gc:setColorRGB(255, 255, 255)
-    gc:fillRect(0, 0, W, H)
+    drawPanel(gc)
     if screen == "select" then
         drawSelect(gc)
     elseif screen == "tf" then
@@ -527,6 +617,11 @@ function on.paint(gc)
     elseif mode == "help" then
         drawHelp(gc)
     end
+    -- brass screws in the panel corners, on top of everything
+    drawScrew(gc, 16, 16, 35)
+    drawScrew(gc, W - 16, 16, -60)
+    drawScrew(gc, 16, H - 16, 110)
+    drawScrew(gc, W - 16, H - 16, -25)
 end
 
 function on.timer()

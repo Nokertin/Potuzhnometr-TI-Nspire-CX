@@ -1,6 +1,6 @@
 # Potuzhnometr for TI-Nspire CX
 
-![Version](https://img.shields.io/badge/version-1.2-blue)
+![Version](https://img.shields.io/badge/version-1.3-blue)
 ![Lua](https://img.shields.io/badge/Lua-5.1-000080)
 ![TI-Nspire CX](https://img.shields.io/badge/TI--Nspire-CX%201st%20gen-193782)
 ![API](https://img.shields.io/badge/TI%20Lua%20API-2.0-green)
@@ -8,6 +8,10 @@
 Шуточный симулятор-измеритель «потужности» для калькулятора **Texas Instruments TI-Nspire CX (1st gen)** — клон одноимённого iOS-приложения. Стрелка, шкала, случайный результат и взрыв при перегрузке.
 
 > **A fun meme-meter simulator for the TI-Nspire CX.** It measures nothing real — the value is random, just like in the original app.
+
+## Дизайн
+
+Приложение оформлено в стиле **старого счётчика Гейгера**: кремовая панель с потёртостями и царапинами, латунные винтики по углам, цифры с засечками, красная опасная зона на шкале и механическое окошко счётчика, в котором показывается значение. На самом калькуляторе текстуры упрощены (Lua рисует только плоские фигуры), но общий вид — тот же.
 
 ## Скриншоты
 
@@ -48,7 +52,6 @@
 4. На калькуляторе открой документ — скрипт запускается сам, когда страница со скриптом активна.
 
 Требования: OS **3.0.2 или новее**. Для CX 1-го поколения последняя версия — **4.5.5.79**, на ней проверено.
-
 
 ## Управление
 
@@ -122,7 +125,7 @@ luna potuzhnometr.lua potuzhnometr.tns
 ```
 .
 ├── potuzhnometr.lua            # исходный код (Lua 5.1, API 2.0)
-├── README.txt                  # инструкция на транслите (внутри архива)
+├── potuzhnometr.tns            # готовый .tns
 ├── README.md                   # этот файл
 └── docs/
     └── screenshots/            # мокапы экранов
@@ -131,12 +134,9 @@ luna potuzhnometr.lua potuzhnometr.tns
         └── screenshot-truefalse.png
 ```
 
-
 ## Ограничения
 
 - Звука нет: у калькулятора нет динамика, взрыв — только анимация.
-- Проверено на реальном TI-Nspire CX 1-го поколения (v1.2 работает, включая `Del` и режим TRUE / FALSE).
-
+- Проверено на реальном TI-Nspire CX 1-го поколения (v1.2 работает, включая `Del` и режим TRUE / FALSE). Версия 1.3 на реальном калькуляторе пока не проверялась.
 
 ---
-
